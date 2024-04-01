@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"mytest/model"
-	"mytest/model/set"
-	"mytest/sort"
 	"strconv"
 	"sync"
 	"time"
@@ -60,7 +58,7 @@ func main1() {
 	bCh <- true
 	wg.Wait()
 }
-func main2() {
+func main() {
 	// 已经被关闭的channel可以再被读吗
 	ch := make(chan bool)
 	go func() {
@@ -79,23 +77,6 @@ outer:
 		default:
 		}
 	}
-}
-func main3() {
-	s := make([]int, 100)
-	for i := 0; i < 100; i++ {
-		s[i] = rand.Intn(1000)
-	}
-	fmt.Println(s)
-	sort.Quick_sort(s, 0, 99)
-	fmt.Println(s)
-}
-func main4() {
-	d := set.NewSet[int](10)
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	for i := 0; i < 100; i++ {
-		d.Store(r.Intn(10))
-	}
-	fmt.Println(d.ListAll())
 }
 
 func main5() {
@@ -202,12 +183,55 @@ func main8() {
 	}()
 	go func() {
 		defer wg.Done()
-		myPrint(ctx, msgCh)
+		myPrint(ctx, msgCh, 0)
 	}()
 	wg.Wait()
 }
-
-func myPrint(ctx context.Context, msgCh chan string) {
+func main11() {
+	bufferSize := 10
+	producerNum := 5
+	workerNum := 10
+	// 生产者每隔50ms生成一个数字，worker每隔500ms从管道中取数字并打印
+	ctx, cancel := context.WithCancel(context.Background())
+	msgCh := make(chan string, bufferSize)
+	wg := new(sync.WaitGroup)
+	for i := 0; i < producerNum; i++ {
+		wg.Add(1)
+		go func(ctx context.Context, producerID int) {
+			defer wg.Done()
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			t := time.NewTicker(time.Millisecond * 50)
+			defer t.Stop()
+			for {
+				select {
+				case <-t.C:
+					select {
+					case msgCh <- fmt.Sprintf("%d_%d", producerID, r.Intn(1000)):
+					default:
+					}
+				case <-ctx.Done():
+					fmt.Println("producer", producerID, "exit")
+					return
+				}
+			}
+		}(ctx, i)
+	}
+	for i := 0; i < workerNum; i++ {
+		wg.Add(1)
+		go func(ctx context.Context, workerID int) {
+			defer wg.Done()
+			myPrint(ctx, msgCh, workerID)
+		}(ctx, i)
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(time.Second * 5)
+		cancel()
+	}()
+	wg.Wait()
+}
+func myPrint(ctx context.Context, msgCh chan string, id int) {
 	t := time.NewTicker(time.Millisecond * 500)
 	defer t.Stop()
 	for {
@@ -215,11 +239,11 @@ func myPrint(ctx context.Context, msgCh chan string) {
 		case <-t.C:
 			select {
 			case s := <-msgCh:
-				fmt.Println(s)
+				fmt.Println("rcvd: ", s)
 			default:
 			}
 		case <-ctx.Done():
-			fmt.Println("g exit", time.Now())
+			fmt.Println("worker[", id, "] exit", time.Now())
 			return
 		}
 	}

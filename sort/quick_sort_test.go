@@ -15,6 +15,6 @@ func TestQuick_sort(t *testing.T) {
 		s[i] = r.Intn(1000)
 	}
 	fmt.Println(s)
-	Quick_sort(s, 0, len(s)-1)
+	QuickSort(s)
 	fmt.Println(s)
 }

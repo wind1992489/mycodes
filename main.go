@@ -1,9 +1,10 @@
-package main
+package main2
 
 import (
 	"context"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -189,7 +190,8 @@ import (
 //		}()
 //		wg.Wait()
 //	}
-func main() {
+
+func main23472() {
 	bufferSize := 10
 	producerNum := 5
 	workerNum := 10
@@ -250,4 +252,38 @@ func myPrint(ctx context.Context, msgCh chan string, id int) {
 			return
 		}
 	}
+}
+
+type tps int
+
+const (
+	x tps = iota
+	y
+	z
+)
+
+func main222() {
+	fmt.Println(runtime.Caller(0))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	d1(ctx)
+}
+func d1(ctx context.Context) {
+	fmt.Println(runtime.Caller(3))
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+	val := ctx.Value("cnt")
+	if val == nil {
+		val = 0
+		ctx = context.WithValue(ctx, "cnt", val)
+	}
+	if val == 5 {
+		return
+	} else {
+		ctx = context.WithValue(ctx, "cnt", val.(int)+1)
+	}
+	d1(ctx)
 }
